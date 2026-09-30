@@ -88,6 +88,11 @@ function createDeepStub(pathLabel: string): StubFunction {
       return {};
     },
     get(_target, prop) {
+      // Preserve native function helpers used by upstream Electron methods.
+      if (prop === "bind" || prop === "call" || prop === "apply") {
+        return Reflect.get(_target, prop);
+      }
+
       if (prop === "then") {
         return undefined;
       }
