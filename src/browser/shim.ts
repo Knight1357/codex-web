@@ -11,6 +11,13 @@ import {
   type WorkspaceDirectoryEntries,
 } from "./workspace-root-dialog";
 
+import {
+  codexOnlyMode,
+  codexOnlyUi,
+  brandMessages,
+  brandDescriptor,
+} from "./codex-only";
+
 type IpcListener = (event: unknown, ...args: unknown[]) => void;
 
 type RendererToMainMessage =
@@ -108,6 +115,11 @@ type StatsigGateEvaluation = {
 };
 
 type ElectronShimState = {
+  codexOnlyMode?: boolean;
+  codexOnly?: typeof codexOnlyUi & {
+    brandMessages: typeof brandMessages;
+    brandDescriptor: typeof brandDescriptor;
+  };
   initialRoute?: string;
   initialSidebarState?: boolean;
   closeSidebar?: () => void;
@@ -367,6 +379,9 @@ const themeMediaQuery = matchMedia("(prefers-color-scheme: dark)");
 const mobileMediaQuery = matchMedia("(max-width: 768px)");
 const initialSidebarState = !mobileMediaQuery.matches;
 const electronShim = (window.__ELECTRON_SHIM__ ??= {});
+electronShim.codexOnlyMode = codexOnlyMode();
+electronShim.codexOnly = { ...codexOnlyUi, brandMessages, brandDescriptor };
+if (codexOnlyMode()) document.title = "Codex";
 const buildFlavor: "prod" | "dev" | "agent" | string = "prod";
 
 Object.assign(globalThis, {
@@ -421,7 +436,11 @@ electronShim.onMemoryNavigationChanged = (navigation) => {
     electronShim.closeSidebar?.();
   }
 
-  const browserPath = mapMemoryPathToBrowserPath(path);
+  const browserPath = mapMemoryPathToBrowserPath(
+    path,
+    navigation.location.search,
+    navigation.location.hash,
+  );
   if (browserPath == null) {
     return;
   }
@@ -430,7 +449,13 @@ electronShim.onMemoryNavigationChanged = (navigation) => {
     document.title = browserPath.titleChange;
   }
 
-  if (window.location.pathname === browserPath.path) {
+  const currentPath = codexOnlyMode()
+    ? window.location.pathname + window.location.search + window.location.hash
+    : window.location.pathname;
+  if (
+    currentPath === browserPath.path ||
+    (codexOnlyMode() && navigation.action !== "PUSH")
+  ) {
     window.history.replaceState(undefined, "", browserPath.path);
     return;
   }

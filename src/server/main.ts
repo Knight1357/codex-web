@@ -18,6 +18,7 @@ import fastifyMultipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { installModuleAliasHook } from "./module";
 import { glob } from "glob";
+import { readUiConfig, uiConfigScript } from "./ui-config";
 
 type ServerOptions = {
   host: string;
@@ -462,7 +463,21 @@ async function startIpcBridgeServer(options: ServerOptions): Promise<void> {
     prefix: "/",
   });
 
-  app.get("/", async (_request, reply) => {
+  const uiConfig = readUiConfig();
+  app.get("/__backend/ui-config.js", async (_request, reply) => {
+    return reply
+      .type("application/javascript")
+      .header("Cache-Control", "no-store")
+      .send(uiConfigScript(uiConfig));
+  });
+
+  app.get("/", async (request, reply) => {
+    if (uiConfig.codexOnlyMode) {
+      const search = new URL(request.url, "http://localhost").search;
+      return reply
+        .header("Cache-Control", "no-store")
+        .redirect(`/codex${search}`);
+    }
     return reply.sendFile("index.html");
   });
 

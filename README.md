@@ -40,6 +40,57 @@ nix run github:0xcaff/codex-web
 
 then open <http://127.0.0.1:8214> in a browser.
 
+### Codex Only Mode
+
+Set the server environment flag to make the browser client use only Codex:
+
+```bash
+CODEX_ONLY_MODE=true npm run server
+```
+
+For a server that needs the host's configured HTTP proxy (Node with environment proxy support):
+
+```bash
+CODEX_ONLY_MODE=true NODE_USE_ENV_PROXY=1 npm run server
+```
+
+The flag defaults to `false`. To restore the upstream UI, restart with
+`CODEX_ONLY_MODE=false`. Changing this runtime flag does not require rebuilding.
+A `.env` file is not loaded automatically; export the variable in your shell or
+pass `--env-file` to Node if you use one.
+
+In this mode `/` redirects to `/codex`, which maps to the upstream Codex agent
+home. Browser thread URLs stay `/thread/<id>`; project/settings links and review
+queries survive refresh and browser Back/Forward. Non-Codex product navigation,
+Quick Chat, product-switch commands, ChatGPT conversations in the sidebar and
+mention picker, unrelated settings, and empty file/site creation shortcuts are
+hidden. Codex projects, local/cloud Codex threads, file outputs, model/reasoning
+controls, review, approvals, sandbox controls, plugins, and account/authentication
+remain available. Codex Voice remains available with Codex labels.
+
+The flag is published as a boolean by `/__backend/ui-config.js` before the
+renderer starts. UI policy lives in `src/browser/codex-only.ts`; one additive
+`patches/webview-codex-only.patch` applies last in `scripts/prepare_asar`. UI message
+literals are branded before interpolation; user content and model responses are
+not rewritten. Stored product/detail preferences, OAuth URLs, tokens, account
+capabilities and the CLI/app-server protocol are not changed. This is a UI mode,
+not an authentication or security boundary.
+
+Verify policy and compatibility with:
+
+```bash
+npm run test:codex-only
+npm run build:browser
+npm run build:server
+```
+
+After updating the downloaded desktop app, bundle hashes and patch context may
+change. Rebase the additive patch after the existing upstream patches and check
+history setup, product/home selectors, sidebar/source filters, internationalized
+labels, settings navigation, and the thread output shortcuts. The internal home
+composer name `work` is shared by the Codex agent; the visible product is forced
+to `codex` without removing that shared component.
+
 ### sign in
 
 ensure the codex cli on the host machine is signed in before starting the

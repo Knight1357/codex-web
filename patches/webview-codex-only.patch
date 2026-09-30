@@ -1,0 +1,468 @@
+--- a/webview/index.html
++++ b/webview/index.html
+@@ -5,10 +5,12 @@
+     <!-- PROD_BASE_TAG_HERE -->
+     <base href="/" />
+     <!-- PROD_CSP_TAG_HERE -->
++    <script src="/__backend/ui-config.js"></script>
+     <script type="module" src="./assets/preload.js"></script>
+     <meta charset="UTF-8" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <title>ChatGPT</title>
++    <script>if (window.__CODEX_WEB_CONFIG__?.codexOnlyMode) { document.title = "Codex"; document.documentElement.style.setProperty("--startup-logo-mask", "url(/favicon.svg)"); }</script>
+     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+     <link rel="manifest" href="/manifest.json" />
+     <style>
+--- a/webview/assets/app-initial-236e1501144c.js
++++ b/webview/assets/app-initial-236e1501144c.js
+@@ -36092,6 +36092,7 @@
+       Go(),
+       Hce(),
+       (cle = function (e, t, n, r) {
++        n = window.__ELECTRON_SHIM__.codexOnly.brandDescriptor(n);
+         var i = [...arguments].slice(4),
+           a = sle(r),
+           o = Qse.apply(void 0, ho([e, t, n, a], i, !1));
+@@ -36109,7 +36110,7 @@
+             formats: a.formats,
+             defaultLocale: a.defaultLocale,
+             defaultFormats: a.defaultFormats,
+-            messages: a.messages,
++            messages: window.__ELECTRON_SHIM__.codexOnly.brandMessages(a.messages),
+             onError: a.onError,
+             defaultRichTextElements: i,
+           };
+@@ -172746,10 +172747,11 @@
+ }) {
+   let a = dT.useRef();
+   a.current ??= F_n({
+-    initialEntries: n ?? [window.__ELECTRON_SHIM__.initialRoute],
++    initialEntries: (n ?? [window.__ELECTRON_SHIM__.initialRoute]).map((entry) => window.__ELECTRON_SHIM__.codexOnly.normalizeRoute(entry)),
+     initialIndex: r,
+     v5Compat: !0,
+   });
++  window.__ELECTRON_SHIM__.codexOnly.guardHistory(a.current);
+   let o = a.current,
+     [s, c] = dT.useState({ action: o.action, location: o.location }),
+     l = dT.useCallback(
+@@ -185149,7 +185151,8 @@
+   );
+ }
+ function hMn() {
+-  return db($O);
++  const detail = db($O);
++  return window.__ELECTRON_SHIM__.codexOnlyMode ? ZO : detail;
+ }
+ function gMn() {
+   let e = (0, vMn.c)(5),
+@@ -185210,6 +185213,7 @@
+           : `everyday`;
+       })),
+       ($O = Iy(Q, ({ get: e }) => {
++        if (window.__ELECTRON_SHIM__.codexOnlyMode) return ZO;
+         let t = e(bMn);
+         return t === `coding`
+           ? ZO
+@@ -365708,6 +365712,7 @@
+       SO(),
+       tk(),
+       (g$ = Iy(Q, ({ get: e }) => {
++        if (window.__ELECTRON_SHIM__.codexOnlyMode) return `codex`;
+         let t = ojn(e, Lv.conversationDetailMode),
+           n = e(N0i)?.roles;
+         return (t == null &&
+@@ -366558,6 +366563,7 @@
+       (Kqa = (0, Wqa.createContext)(null)));
+   });
+ function C$(e, t) {
++  if (window.__ELECTRON_SHIM__.codexOnlyMode) return;
+   (t === `chat` && e.get(qO)) || e.set(eJa, t);
+ }
+ function Jqa(e) {
+@@ -366580,7 +366586,7 @@
+   workOnlyModeEnabled: r = !1,
+   workModeEnabled: i,
+ }) {
+-  return n !== `extension` && e.isCapable && i && !r && !t;
++  return !window.__ELECTRON_SHIM__.codexOnlyMode && n !== `extension` && e.isCapable && i && !r && !t;
+ }
+ function Qqa({
+   chatGptProductAccess: e,
+@@ -366591,6 +366597,7 @@
+   workModeAllowed: a,
+   workModeEnabled: o,
+ }) {
++  if (window.__ELECTRON_SHIM__.codexOnlyMode) return `work`; // Shared Codex agent composer.
+   let s = e.isError || (!e.isLoading && !e.isCapable);
+   return r === `extension` || i
+     ? `work`
+@@ -436327,6 +436334,7 @@
+     (($Qo = u()), zK(), sU(), (e$o = G()));
+   });
+ function n$o(e) {
++  if (!window.__ELECTRON_SHIM__.codexOnly.isCommandAllowed(e)) return !1;
+   switch (`electron`) {
+     case `browser`:
+       return !1;
+@@ -436343,7 +436351,7 @@
+     case void 0:
+       return !0;
+     case `chatgpt`:
+-      return t;
++      return !window.__ELECTRON_SHIM__.codexOnlyMode && t;
+     case `codex`:
+       return n;
+   }
+@@ -445474,6 +445482,7 @@
+     startNewConversation: a,
+   },
+ ) {
++  if (window.__ELECTRON_SHIM__.codexOnlyMode && i !== `codex`) return;
+   if (i === `codex`)
+     switch (t) {
+       case `loading`:
+--- a/webview/assets/app-primary-6b28e06666ff.js
++++ b/webview/assets/app-primary-6b28e06666ff.js
+@@ -78779,7 +78779,7 @@
+   t[0] === Symbol.for(`react.memo_cache_sentinel`)
+     ? ((a = { name: `chatgpt` }), (t[0] = a))
+     : (a = t[0]);
+-  let o = qw(Lr, a).isCapable,
++  let o = qw(Lr, a).isCapable && !window.__ELECTRON_SHIM__.codexOnlyMode,
+     s;
+   t[1] === r ? (s = t[2]) : ((s = r.get(Yf)), (t[1] = r), (t[2] = s));
+   let c = s,
+@@ -128710,7 +128710,7 @@
+   let t = (0, Hmn.c)(8),
+     { isPetVisible: n, onTogglePet: r, petShortcut: i } = e,
+     a = Jv(`1532120159`);
+-  if (r == null) return null;
++  if (r == null || window.__ELECTRON_SHIM__.codexOnlyMode) return null;
+   let o;
+   if (a) {
+     let e;
+@@ -142173,7 +142173,7 @@
+         hasUnreadActivity: !1,
+       }),
+     M.push(...A.filter(({ id: e }) => e !== Wy.pullRequests)),
+-    M
++    window.__ELECTRON_SHIM__.codexOnly.filterDestinations(M)
+   );
+ }
+ function QSn() {
+@@ -146016,7 +146016,7 @@
+ function tTn(e) {
+   let t = (0, rZ.c)(38),
+     { homeComposerMode: n, quickChatEnabled: r } = e,
+-    i = r !== void 0 && r,
++    i = !window.__ELECTRON_SHIM__.codexOnlyMode && r !== void 0 && r,
+     a = MT(Em),
+     o = Vl(),
+     s = Rp(),
+@@ -146097,12 +146097,12 @@
+         n === `chat`
+           ? (0, aZ.jsx)(Y, {
+               id: `sidebarElectron.workNewChatNavLink`,
+-              defaultMessage: `New chat`,
++              defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+               description: `Starts a new chat from the sidebar`,
+             })
+           : (0, aZ.jsx)(Y, {
+-              id: `sidebarElectron.newThread`,
+-              defaultMessage: `New chat`,
++              id: window.__ELECTRON_SHIM__.codexOnlyMode ? `codexWeb.newThread` : `sidebarElectron.newThread`,
++              defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+               description: `Starts a new chat from the sidebar`,
+             })),
+       (t[18] = n),
+@@ -154043,7 +154043,7 @@
+       QOn({ title: ft, titleOverride: L }) ??
+       We.formatMessage({
+         id: `codex.taskRow.title`,
+-        defaultMessage: `New chat`,
++        defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+         description: `Default title for a Codex task that doesn't have a title`,
+       }),
+     Ot;
+@@ -158453,7 +158453,7 @@
+         },
+         defaultTaskTitle: {
+           id: `codex.taskRow.title`,
+-          defaultMessage: `New chat`,
++          defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+           description: `Default title for a Codex task that doesn't have a title`,
+         },
+       })));
+@@ -284728,7 +284728,7 @@
+       showSourceFilter: i,
+       sidebarMode: a,
+     } = e,
+-    o = i === void 0 || i,
++    o = !window.__ELECTRON_SHIM__.codexOnlyMode && (i === void 0 || i),
+     s = MT(Em),
+     c = Vl(),
+     l = kx(OC),
+@@ -284790,8 +284790,8 @@
+               className: n === `list` ? `pe-0.5` : void 0,
+               children: (0, o2.jsx)(k4n, {
+                 newChatMessage: c.formatMessage({
+-                  id: `sidebarElectron.newThread`,
+-                  defaultMessage: `New chat`,
++                  id: window.__ELECTRON_SHIM__.codexOnlyMode ? `codexWeb.newThread` : `sidebarElectron.newThread`,
++                  defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+                   description: `Starts a new chat from the sidebar`,
+                 }),
+                 onStartChat: h,
+@@ -286145,8 +286145,8 @@
+     (ay(),
+       (d2 = Kn({
+         emptyState: {
+-          id: `sidebarElectron.tasksSection.emptyState`,
+-          defaultMessage: `No chats`,
++          id: window.__ELECTRON_SHIM__.codexOnlyMode ? `codexWeb.noThreads` : `sidebarElectron.tasksSection.emptyState`,
++          defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `No threads` : `No chats`,
+           description: `Empty state shown when the chat section in the Codex sidebar has no Codex or ChatGPT conversations`,
+         },
+         error: {
+@@ -290525,7 +290525,7 @@
+   t[33] === Symbol.for(`react.memo_cache_sentinel`)
+     ? ((ee = (0, D2.jsx)(Y, {
+         id: `sidebarElectron.noTasks`,
+-        defaultMessage: `No chats`,
++        defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `No threads` : `No chats`,
+         description: `Shown when a folder group has no tasks`,
+       })),
+       (t[33] = ee))
+@@ -291027,7 +291027,7 @@
+   t[2] === Symbol.for(`react.memo_cache_sentinel`)
+     ? ((F = (0, D2.jsx)(Y, {
+         id: `sidebarElectron.noTasks`,
+-        defaultMessage: `No chats`,
++        defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `No threads` : `No chats`,
+         description: `Shown when a folder group has no tasks`,
+       })),
+       (t[2] = F))
+@@ -292982,8 +292982,8 @@
+   t[2] === h
+     ? (T = t[3])
+     : ((T = h.formatMessage({
+-        id: `sidebarElectron.newThread`,
+-        defaultMessage: `New chat`,
++        id: window.__ELECTRON_SHIM__.codexOnlyMode ? `codexWeb.newThread` : `sidebarElectron.newThread`,
++        defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+         description: `Starts a new chat from the sidebar`,
+       })),
+       (t[2] = h),
+@@ -311643,6 +311643,7 @@
+   a === `chatgpt` && !b
+     ? (P = `codex`)
+     : a === `chatgpt` && !N && (P = `chatgpt`);
++  if (window.__ELECTRON_SHIM__.codexOnlyMode) P = `codex`;
+   let F = a === `chatgpt` && P !== `codex`,
+     I;
+   t[1] === F ? (I = t[2]) : ((I = { enabled: F }), (t[1] = F), (t[2] = I));
+@@ -311658,7 +311659,7 @@
+               : [t];
+           }) ?? [])
+         : [],
+-    V = kx(f4),
++    V = kx(f4) && !window.__ELECTRON_SHIM__.codexOnlyMode,
+     H = `tasks`;
+   !o || P === `chatgpt` ? (H = `chats`) : P === `all` && (H = `all`);
+   let U = kx(oce),
+@@ -312213,7 +312214,7 @@
+       })),
+       (t[53] = C),
+       (t[54] = Lt));
+-  let Rt = Lt,
++  let Rt = window.__ELECTRON_SHIM__.codexOnlyMode ? `Threads` : Lt,
+     zt = Jpe($e.chatAttentionStates),
+     Bt;
+   t[55] !== fe ||
+@@ -316316,8 +316317,8 @@
+   t[0] === r
+     ? (s = t[1])
+     : ((s = r.formatMessage({
+-        id: `sidebar.voice.startAriaLabel`,
+-        defaultMessage: `Start new voice chat`,
++        id: window.__ELECTRON_SHIM__.codexOnlyMode ? `codexWeb.startVoiceThread` : `sidebar.voice.startAriaLabel`,
++        defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `Start Codex voice thread` : `Start new voice chat`,
+         description: `Accessible label for the sidebar footer button that starts a new voice chat`,
+       })),
+       (t[0] = r),
+@@ -318558,7 +318559,7 @@
+     h = kx(l_),
+     g = kx(hS),
+     _ = kx(tke),
+-    v = _.status === `denied` && _.reason === `unsupported-auth`,
++    v = window.__ELECTRON_SHIM__.codexOnlyMode || (_.status === `denied` && _.reason === `unsupported-auth`),
+     y = p.status === `allowed` || p.status === `loading`,
+     { accountId: b, authMethod: x } = Ff(),
+     [S, C] = (0, M4.useState)(0),
+@@ -319092,8 +319093,8 @@
+           home: {
+             id: `builtin:home`,
+             label: (0, N4.jsx)(Y, {
+-              id: `sidebarElectron.rail.home`,
+-              defaultMessage: `Chats`,
++              id: window.__ELECTRON_SHIM__.codexOnlyMode ? `codexWeb.threads` : `sidebarElectron.rail.home`,
++              defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `Threads` : `Chats`,
+               description: `Returns to chats from another app destination`,
+             }),
+             icon: ne === `codex` ? bre : iee,
+@@ -336644,13 +336645,13 @@
+   t[0] !== o || t[1] !== a
+     ? ((u = a
+         ? o.formatMessage({
+-            id: `composer.realtime.startNewVoiceChat`,
+-            defaultMessage: `Start new voice chat`,
++            id: window.__ELECTRON_SHIM__.codexOnlyMode ? `codexWeb.startVoiceThread` : `composer.realtime.startNewVoiceChat`,
++            defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `Start Codex voice thread` : `Start new voice chat`,
+             description: `Accessible label and tooltip for starting a new voice chat from the Home composer`,
+           })
+         : o.formatMessage({
+-            id: `composer.realtime.start`,
+-            defaultMessage: `Start voice chat`,
++            id: window.__ELECTRON_SHIM__.codexOnlyMode ? `codexWeb.voiceThread` : `composer.realtime.start`,
++            defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `Start Codex voice thread` : `Start voice chat`,
+             description: `Accessible label and tooltip for starting realtime voice in an existing thread`,
+           })),
+       (t[0] = o),
+@@ -345077,7 +345078,7 @@
+         : e === `new_chat`
+           ? (0, e8.jsx)(Y, {
+               id: `chatgptConversations.rateLimitBanner.newChat`,
+-              defaultMessage: `New chat`,
++              defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+               description: `Button in a Chat rate-limit banner that starts a new Chat conversation`,
+             })
+           : e === `goto_codex` || e === `try_codex`
+@@ -390552,7 +390553,7 @@
+     ? (me = t[39])
+     : ((me = y.formatMessage({
+         id: `composer.newSlashCommand.title`,
+-        defaultMessage: `New chat`,
++        defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+         description: `Title for the new chat slash command`,
+       })),
+       (t[38] = y),
+@@ -409324,7 +409325,7 @@
+         (se
+           ? (0, W9.jsx)(Y, {
+               id: `composer.localCwdDropdown.newChat`,
+-              defaultMessage: `New chat`,
++              defaultMessage: window.__ELECTRON_SHIM__.codexOnlyMode ? `New thread` : `New chat`,
+               description: `Label shown when no project is selected in the electron app`,
+             })
+           : (0, W9.jsx)(Y, {
+@@ -412077,6 +412078,7 @@
+       ? (P = `work`)
+       : c.isCapable && (A || !x) && (P = `chat`)
+     : (P = `chat`);
++  if (window.__ELECTRON_SHIM__.codexOnlyMode) P = `work`;
+   let F = S && u.status === `allowed`,
+     I =
+       a === `chat` &&
+--- a/webview/assets/settings-page-acc11b1e910d.js
++++ b/webview/assets/settings-page-acc11b1e910d.js
+@@ -2129,7 +2129,7 @@
+           canCollapse: !1,
+           codexMicroDeviceModel: i,
+           showEnterpriseUsageLabel: oe,
+-          settingsSections: ae,
++          settingsSections: window.__ELECTRON_SHIM__.codexOnly.filterSettings(ae),
+           activeSection: He,
+           activeMcpExtensionSettingsView: _,
+           mcpExtensionSettingsViews: h,
+--- a/webview/assets/local-conversation-thread-9a0a61c5e076.js
++++ b/webview/assets/local-conversation-thread-9a0a61c5e076.js
+@@ -4786,13 +4786,13 @@
+     : (F = t[21]);
+   let I = Lu(F),
+     L = m.kind === `local` ? Jy : void 0;
+-  if (A.length === 0 && !D && S.length === 0) return null;
++  if (A.length === 0 && (!D || window.__ELECTRON_SHIM__.codexOnlyMode) && S.length === 0) return null;
+   let R;
+   t[22] === S ? (R = t[23]) : ((R = null), (t[22] = S), (t[23] = R));
+   let z;
+   t[24] !== x || t[25] !== c || t[26] !== o || t[27] !== S || t[28] !== D
+     ? ((z =
+-        o === `summary` && D && x.length === 0 && S.length === 0
++        !window.__ELECTRON_SHIM__.codexOnlyMode && o === `summary` && D && x.length === 0 && S.length === 0
+           ? (0, ob.jsx)(Xy, { open: c, variant: `row`, onOpen: () => l(!0) })
+           : null),
+       (t[24] = x),
+@@ -4841,7 +4841,7 @@
+   if (o === `list`) return H;
+   let U;
+   t[42] !== c || t[43] !== D
+-    ? ((U = D
++    ? ((U = D && !window.__ELECTRON_SHIM__.codexOnlyMode
+         ? (0, ob.jsx)(Q.SectionActions, {
+             children: (0, ob.jsx)(Xy, {
+               open: c,
+--- a/webview/assets/general-settings-f0dd56c74db0.js
++++ b/webview/assets/general-settings-f0dd56c74db0.js
+@@ -4025,7 +4025,7 @@
+   return (
+     e[5] === n
+       ? (a = e[6])
+-      : ((a = (0, $.jsxs)(me, { title: r, children: [n, i] })),
++      : ((a = (0, $.jsxs)(me, { title: r, children: [n, window.__ELECTRON_SHIM__.codexOnlyMode ? null : i] })),
+         (e[5] = n),
+         (e[6] = a)),
+     a
+@@ -4088,7 +4088,7 @@
+   let h;
+   e[10] === Symbol.for(`react.memo_cache_sentinel`)
+     ? ((h = (0, $.jsx)($.Fragment, {
+-        children: (0, $.jsx)(Co, { appName: E }),
++        children: (0, $.jsx)(Co, { appName: window.__ELECTRON_SHIM__.codexOnlyMode ? `Codex` : E }),
+       })),
+       (e[10] = h))
+     : (h = e[10]);
+@@ -4285,7 +4285,7 @@
+                       (0, $.jsx)(jo, {}),
+                       (0, $.jsxs)($.Fragment, {
+                         children: [
+-                          (0, $.jsx)(Co, { appName: `ChatGPT` }),
++                          (0, $.jsx)(Co, { appName: window.__ELECTRON_SHIM__.codexOnlyMode ? `Codex` : `ChatGPT` }),
+                           (0, $.jsx)(ho, {}),
+                           (0, $.jsx)(go, {}),
+                         ],
+@@ -5381,7 +5381,7 @@
+                     id: `settings.agentEnvironment.restartNotice`,
+                     defaultMessage: `Restart {appName} to apply this change. The agent is still running in {currentEnvironment}.`,
+                     description: `Notice shown when the selected agent environment differs from the current pre-restart environment`,
+-                    values: { appName: E, currentEnvironment: C.label },
++                    values: { appName: window.__ELECTRON_SHIM__.codexOnlyMode ? `Codex` : E, currentEnvironment: C.label },
+                   }),
+                 }),
+               ],
+@@ -6394,7 +6394,7 @@
+         id: `settings.general.followUpQueueMode.description`,
+         defaultMessage: `Queue follow-ups while {appName} runs or steer the current run. Press {invertFollowUpShortcutLabel} to do the opposite for one message`,
+         description: `Explains that a follow-up message sent during an active Codex run can wait in a queue or be applied to the current run, and that the named shortcut temporarily chooses the other behavior`,
+-        values: { appName: E, invertFollowUpShortcutLabel: o },
++        values: { appName: window.__ELECTRON_SHIM__.codexOnlyMode ? `Codex` : E, invertFollowUpShortcutLabel: o },
+       })),
+       (e[5] = o),
+       (e[6] = u));
+@@ -6625,7 +6625,7 @@
+             id: `settings.general.appearance.sansFontSize.row.description`,
+             defaultMessage: `Adjust the base size used for the {appName} UI`,
+             description: `Description for UI font size setting`,
+-            values: { appName: E },
++            values: { appName: window.__ELECTRON_SHIM__.codexOnlyMode ? `Codex` : E },
+           })
+         : (0, $.jsx)(I, {
+             id: `settings.general.appearance.sansFontSize.chatGptDescription`,
+@@ -6984,7 +6984,7 @@
+         id: `settings.general.power.preventSleepWhileRunning.description`,
+         defaultMessage: `Keep your computer awake while {appName} is running a task`,
+         description: `Description for preventing sleep while a task runs`,
+-        values: { appName: E },
++        values: { appName: window.__ELECTRON_SHIM__.codexOnlyMode ? `Codex` : E },
+       })),
+       (e[1] = s))
+     : (s = e[1]);

@@ -1,3 +1,5 @@
+import { codexOnlyMode, isCodexRoute } from "./codex-only";
+
 export function mapBrowserPathToInitialRoute(pathname: string, search: string) {
   if (pathname === "/share/receive" && search) {
     const params = new URLSearchParams(search);
@@ -13,12 +15,19 @@ export function mapBrowserPathToInitialRoute(pathname: string, search: string) {
       memoryPath: prompt
         ? `/?${new URLSearchParams({ prompt }).toString()}`
         : "/",
-      browserPath: "/",
+      browserPath: codexOnlyMode() ? "/codex" : "/",
     };
   }
 
   return {
-    memoryPath: mapBrowserPathToRoute(pathname),
+    memoryPath:
+      mapBrowserPathToRoute(pathname) + (codexOnlyMode() ? search : ""),
+    ...(codexOnlyMode() &&
+    !isCodexRoute(pathname) &&
+    pathname !== "/codex" &&
+    !/^\/thread\/[^/]+$/.test(pathname)
+      ? { browserPath: "/codex" }
+      : {}),
   };
 }
 
@@ -32,20 +41,32 @@ function mapBrowserPathToRoute(pathname: string): string {
     }
   }
 
+  if (codexOnlyMode() && pathname !== "/codex" && isCodexRoute(pathname))
+    return pathname;
   return "/";
 }
 
-export function mapMemoryPathToBrowserPath(pathname: string) {
+export function mapMemoryPathToBrowserPath(
+  pathname: string,
+  search = "",
+  hash = "",
+) {
+  const suffix = codexOnlyMode() ? search + hash : "";
   if (pathname === "/") {
-    return { path: "/", titleChange: "Codex" };
+    return {
+      path: (codexOnlyMode() ? "/codex" : "/") + suffix,
+      titleChange: "Codex",
+    };
   }
 
   const match = pathname.match(/^\/local\/([^/?#]+)$/);
   if (!match) {
-    return null;
+    return codexOnlyMode() && isCodexRoute(pathname)
+      ? { path: pathname + suffix, titleChange: "Codex" }
+      : null;
   }
 
-  return { path: `/thread/${encodeURIComponent(match[1])}` };
+  return { path: `/thread/${encodeURIComponent(match[1])}${suffix}` };
 }
 
 export function dispatchNavigateToRoute(path: string): void {
@@ -60,5 +81,13 @@ export function dispatchNavigateToRoute(path: string): void {
 }
 
 window.addEventListener("popstate", () => {
-  dispatchNavigateToRoute(mapBrowserPathToRoute(window.location.pathname));
+  if (!codexOnlyMode()) {
+    dispatchNavigateToRoute(mapBrowserPathToRoute(window.location.pathname));
+    return;
+  }
+  const route = mapBrowserPathToInitialRoute(
+    window.location.pathname,
+    window.location.search,
+  );
+  dispatchNavigateToRoute(route.memoryPath);
 });
