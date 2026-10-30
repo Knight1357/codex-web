@@ -2,8 +2,6 @@ import { emitRendererEvent, isRecord } from "./shim";
 
 type CodexFetchMessage = {
   body?: string;
-  headers?: Record<string, string>;
-  hostId?: string;
   method: string;
   requestId: string;
   type: "fetch";
@@ -12,7 +10,6 @@ type CodexFetchMessage = {
 
 type PickFilesRequest = {
   imagesOnly?: boolean;
-  pickerTitle?: string;
 };
 
 function openBrowserFilePicker({
@@ -120,7 +117,6 @@ export async function handleLocalFilePickerMessage(message: CodexFetchMessage) {
 
     sendFetchResponse(message, {
       responseType: "error",
-      status: 432,
       error: errorMessage(error),
     });
   }
@@ -170,8 +166,6 @@ function parsePickFilesRequest(message: CodexFetchMessage): PickFilesRequest {
     return {
       imagesOnly:
         typeof parsed.imagesOnly === "boolean" ? parsed.imagesOnly : undefined,
-      pickerTitle:
-        typeof parsed.pickerTitle === "string" ? parsed.pickerTitle : undefined,
     };
   } catch {
     return {};
@@ -184,12 +178,10 @@ function sendFetchResponse(
     | {
         responseType: "success";
         body: unknown;
-        status?: number;
       }
     | {
         responseType: "error";
         error: string;
-        status?: number;
       },
 ): void {
   const payload =
@@ -198,7 +190,7 @@ function sendFetchResponse(
           type: "fetch-response",
           responseType: "success",
           requestId: message.requestId,
-          status: response.status ?? 200,
+          status: 200,
           headers: { "content-type": "application/json" },
           bodyJsonString: JSON.stringify(response.body),
         }
@@ -206,7 +198,7 @@ function sendFetchResponse(
           type: "fetch-response",
           responseType: "error",
           requestId: message.requestId,
-          status: response.status ?? 432,
+          status: 432,
           error: response.error,
         };
 

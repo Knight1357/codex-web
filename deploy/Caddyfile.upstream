@@ -1,0 +1,8 @@
+# Replace only the reverse_proxy in the authenticated Codex site block.
+# The LaunchAgent creates the loopback tunnel; Tailscale remains a fallback.
+reverse_proxy 127.0.0.1:18214 100.116.14.53:8214 {
+    lb_policy first
+    lb_try_duration 5s
+    fail_duration 10s
+    flush_interval -1
+}

@@ -1,0 +1,131 @@
+--- a/webview/assets/app-initial-236e1501144c.js
++++ b/webview/assets/app-initial-236e1501144c.js
+@@ -413271,7 +413271,7 @@
+   ]);
+ }
+ function tAo(e) {
+-  return [e, ...(e.materializationScopes ?? [])];
++  return [e, ...(e.materializationScopes ?? [])].map(window.__ELECTRON_SHIM__.catalogPagination.scope);
+ }
+ function nAo() {
+   return new Promise((e) => {
+@@ -413316,7 +413316,7 @@
+         constructor(e, t, n, r, i = `immediate`) {
+           ((this.appScope = e),
+             (this.service = t),
+-            (this.hostIds = n),
++            (this.hostIds = window.__ELECTRON_SHIM__.catalogPagination.hosts(n)),
+             (this.sortKey = r),
+             (this.#p = i === `immediate`));
+         }
+@@ -413492,7 +413492,7 @@
+             fingerprint: n,
+             scope: e,
+             hosts: new Map(
+-              (e.hostIds ?? this.hostIds).map((e) => [
++              window.__ELECTRON_SHIM__.catalogPagination.hosts(e.hostIds ?? this.hostIds).map((e) => [
+                 e,
+                 {
+                   desired: t?.hosts.get(e)?.desired ?? 0,
+@@ -413777,7 +413777,7 @@
+   let a = mb(yX, i),
+     o = db(bk),
+     s =
+-      a.isCapable && o.status === `allowed` && `accountId` in o
++      !window.__ELECTRON_SHIM__.codexOnlyMode && a.isCapable && o.status === `allowed` && `accountId` in o
+         ? o.accountId
+         : null,
+     c = db(WP),
+@@ -413978,7 +413978,7 @@
+   let S = x,
+     C;
+   t[16] !== S || t[17] !== o || t[18] !== n || t[19] !== c
+-    ? ((C = new sAo(o, n, S, c, `deferred`)),
++    ? ((C = window.__ELECTRON_SHIM__.catalogPagination.reader(new sAo(o, n, S, c, `deferred`))),
+       (t[16] = S),
+       (t[17] = o),
+       (t[18] = n),
+--- a/webview/assets/app-primary-6b28e06666ff.js
++++ b/webview/assets/app-primary-6b28e06666ff.js
+@@ -284647,6 +284647,7 @@
+   canFetchNextConversationPage: t,
+   isFetchingNextConversationPage: n,
+ }) {
++  if (window.__ELECTRON_SHIM__.codexOnlyMode) return e;
+   return { hasMore: e.hasMore || t || n, isLoading: e.isLoading || n };
+ }
+ async function D4n({
+@@ -284658,7 +284659,7 @@
+   fetchNextConversationPage: a,
+ }) {
+   let o = e != null && t != null && r ? e.loadMore(t, n) : Promise.resolve();
+-  (i && a(), await o);
++  (!window.__ELECTRON_SHIM__.codexOnlyMode && i && a(), await o);
+ }
+ var O4n = t(() => {});
+ function k4n(e) {
+@@ -311741,7 +311742,7 @@
+     ke = Bhn({
+       conversationFilter: H,
+       customSectionItemKeys: te,
+-      enabled: a === `chatgpt` || V,
++      enabled: !window.__ELECTRON_SHIM__.codexOnlyMode && (a === `chatgpt` || V),
+       flatConversationHistory: A === `list` || P === `codex`,
+     }),
+     Ae = qw(cf, ke.activeConversationId ?? ke.activeServerConversationId),
+@@ -312313,6 +312314,18 @@
+                 keys: $e.chatKeys,
+                 hasMoreItems: Vt.hasMore,
+                 isLoadingMore: Vt.isLoading,
++                afterItemsNode: Vt.hasError
++                  ? (0, d4.jsx)(`button`, {
++                      type: `button`,
++                      className: `px-3 py-2 text-sm text-codex-description`,
++                      onClick: () => le?.retryPage(n, 10).catch(Atr),
++                      children: C.formatMessage({
++                        id: `codexWeb.threads.retry`,
++                        defaultMessage: `Could not load more threads. Retry`,
++                        description: `Button to retry loading the thread list after a failed or stalled page request`,
++                      }),
++                    })
++                  : void 0,
+                 browserLoadingPlaceholder:
+                   a === `chatgpt` ? (0, d4.jsx)(JTn, {}) : void 0,
+                 maxItems: 10,
+@@ -313146,6 +313159,7 @@
+       (t[72] = xe))
+     : (xe = t[72]);
+   let Se;
++  window.__ELECTRON_SHIM__.codexOnlyMode ||
+   t[73] !== r ||
+   t[74] !== oe.activationProps ||
+   t[75] !== c ||
+@@ -313187,7 +313201,7 @@
+         revealAllOnExpand: _e,
+         showLessButton: M,
+         renderBeforeItem: ve,
+-        afterItemsNode: be,
++        afterItemsNode: e.afterItemsNode ?? be,
+         dragActivationProps: oe.activationProps,
+         renderRow: xe,
+       })),
+--- a/.vite/build/main-C5K7o1Hr.js
++++ b/.vite/build/main-C5K7o1Hr.js
+@@ -134784,7 +134784,7 @@
+       });
+     let { downloadStore: c } = s,
+       u =
+-        this.threadCatalogSyncManager == null
++        this.threadCatalogSyncManager == null || globalThis.__CODEX_SHIM_VALUES__?.codexOnlyMode
+           ? void 0
+           : new LSe(this.threadCatalogSyncManager, {
+               getPrincipal: () => i.getAuthenticatedPrincipal(),
+@@ -135514,7 +135514,7 @@
+         .hosts.map(({ hostId: e }) => e)
+         .filter((n) =>
+           n.startsWith(`chatgpt:`)
+-            ? n === a && e.getCoordinator(n) != null
++            ? !globalThis.__CODEX_SHIM_VALUES__?.codexOnlyMode && n === a && e.getCoordinator(n) != null
+             : n === `local` ||
+               t[n] === !0 ||
+               (t[n] !== !1 && (r.has(n) || n.startsWith(`remote-wsl:`))),

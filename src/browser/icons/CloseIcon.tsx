@@ -4,7 +4,7 @@ export function CloseIcon(): React.ReactElement {
   return (
     <svg
       aria-hidden="true"
-      className={["icon-xs"].join(" ")}
+      className="icon-xs"
       fill="none"
       height="21"
       viewBox="0 0 21 21"

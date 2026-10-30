@@ -8,16 +8,10 @@ declare global {
   }
 }
 
-const destinations = new Set([
-  "builtin:projects",
-  "builtin:pull-requests",
-  "builtin:automations",
-  "builtin:archive",
-  "builtin:skills",
-  "builtin:security",
-  "builtin:activity",
-]);
+const destinations = new Set(["builtin:projects", "builtin:archive"]);
 const excludedSettings = new Set([
+  "account",
+  "usage",
   "voice",
   "pets",
   "chronicle",
@@ -27,6 +21,19 @@ const excludedSettings = new Set([
   "import",
   "profile",
   "analytics",
+  "cloud-settings",
+  "cloud-environments",
+  "local-environments",
+  "worktrees",
+  "environments",
+  "hooks-settings",
+  "connections",
+  "plugins-settings",
+  "skills-settings",
+  "browser-use",
+  "computer-use",
+  "code-review",
+  "debug",
 ]);
 const routeRoots = new Set([
   "projects",
@@ -34,15 +41,8 @@ const routeRoots = new Set([
   "remote",
   "settings",
   "codex-access",
-  "plugins",
-  "skills",
-  "pull-requests",
-  "automations",
-  "security",
   "archive",
-  "remote-connections",
   "mcp-app",
-  "hotkey-window",
   "login",
   "welcome",
   "select-workspace",
@@ -50,7 +50,6 @@ const routeRoots = new Set([
   "oauth",
   "connector",
   "checkout",
-  "pricing-plan",
   "workspace-settings",
 ]);
 
@@ -76,7 +75,7 @@ export function normalizeRoute<
   if (isCodexRoute(path)) return target;
   return typeof target === "string"
     ? "/"
-    : { ...target, pathname: "/", search: "", hash: "" };
+    : { ...(target as T & object), pathname: "/", search: "", hash: "" };
 }
 
 type Target = string | { pathname?: string; search?: string; hash?: string };
@@ -116,7 +115,7 @@ export const codexOnlyUi = {
     if (!codexOnlyMode()) return true;
     return (
       command.commandMenuFeature !== "chatgpt" &&
-      !/switchToMode[12]$|quickChat|openAvatarOverlay|library|gpts|finance|sites|workspaceAgent/i.test(
+      !/switchToMode[12]$|quickChat|openAvatarOverlay|library|gpts|finance|sites|workspaceAgent|openPlugins|openSkills|openAutomations|openSecurity|openPullRequests/i.test(
         command.id ?? "",
       )
     );

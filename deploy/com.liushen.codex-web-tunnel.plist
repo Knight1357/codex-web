@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>com.liushen.codex-web-tunnel</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/ssh</string>
+		<string>-NT</string>
+		<string>-o</string>
+		<string>BatchMode=yes</string>
+		<string>-o</string>
+		<string>ExitOnForwardFailure=yes</string>
+		<string>-o</string>
+		<string>ServerAliveInterval=15</string>
+		<string>-o</string>
+		<string>ServerAliveCountMax=3</string>
+		<string>-o</string>
+		<string>ConnectTimeout=12</string>
+		<string>-o</string>
+		<string>ProxyCommand=/usr/bin/nc -X 5 -x 127.0.0.1:7897 %h %p</string>
+		<string>-R</string>
+		<string>127.0.0.1:18214:127.0.0.1:8214</string>
+		<string>Los-Angeles-2c2g-vps</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/tmp/codex-web-tunnel.log</string>
+	<key>StandardOutPath</key>
+	<string>/tmp/codex-web-tunnel.log</string>
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/liushen</string>
+</dict>
+</plist>

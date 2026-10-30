@@ -52,9 +52,9 @@ export default defineConfig({
       transformMixedEsModules: true,
     },
     emptyOutDir: false,
-    minify: false,
+    minify: true,
     outDir: path.resolve(webviewRoot, "assets"),
-    sourcemap: true,
+    sourcemap: false,
     lib: {
       entry: preloadEntryPath,
       fileName: () => "preload.js",

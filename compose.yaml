@@ -1,0 +1,18 @@
+services:
+  codex-web:
+    build: .
+    image: codex-web:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8214:8214"
+      - "127.0.0.1:1455:1456"
+    environment:
+      CODEX_ONLY_MODE: "true"
+    volumes:
+      - codex-home:/home/node
+      - workspace:/workspace
+
+volumes:
+  codex-home:
+  workspace:

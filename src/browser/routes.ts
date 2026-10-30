@@ -1,24 +1,6 @@
 import { codexOnlyMode, isCodexRoute } from "./codex-only";
 
 export function mapBrowserPathToInitialRoute(pathname: string, search: string) {
-  if (pathname === "/share/receive" && search) {
-    const params = new URLSearchParams(search);
-
-    const prompt = ["title", "text", "url"]
-      .flatMap((name) => {
-        const value = params.get(name);
-        return value === null ? [] : [`${name}: ${value}`];
-      })
-      .join("\n");
-
-    return {
-      memoryPath: prompt
-        ? `/?${new URLSearchParams({ prompt }).toString()}`
-        : "/",
-      browserPath: codexOnlyMode() ? "/codex" : "/",
-    };
-  }
-
   return {
     memoryPath:
       mapBrowserPathToRoute(pathname) + (codexOnlyMode() ? search : ""),

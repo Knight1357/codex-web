@@ -4,11 +4,7 @@ export function FolderIcon(): React.ReactElement {
   return (
     <svg
       aria-hidden="true"
-      className={[
-        "icon-xs",
-        "shrink-0",
-        "text-token-description-foreground",
-      ].join(" ")}
+      className="icon-xs shrink-0 text-token-description-foreground"
       fill="none"
       height="20"
       viewBox="0 0 20 20"

@@ -17,6 +17,8 @@ import {
   brandMessages,
   brandDescriptor,
 } from "./codex-only";
+import { catalogPagination } from "./catalog-pagination";
+import { installFileDownloads } from "./downloads";
 
 type IpcListener = (event: unknown, ...args: unknown[]) => void;
 
@@ -51,7 +53,6 @@ type RendererToMainMessage =
       type: "workspace-directory-entries-request";
       requestId: string;
       directoryPath: string | null;
-      directoriesOnly: boolean;
     };
 
 type MainToRendererMessage =
@@ -98,13 +99,10 @@ const RECONNECT_DELAY_MS = 1_000;
 
 type MemoryNavigationChange = {
   action: "POP" | "PUSH" | "REPLACE";
-  delta: number;
   location: {
     hash: string;
-    key: string;
     pathname: string;
     search: string;
-    state: unknown;
   };
 };
 
@@ -115,6 +113,7 @@ type StatsigGateEvaluation = {
 };
 
 type ElectronShimState = {
+  catalogPagination?: typeof catalogPagination;
   codexOnlyMode?: boolean;
   codexOnly?: typeof codexOnlyUi & {
     brandMessages: typeof brandMessages;
@@ -163,7 +162,6 @@ const rendererListeners = new Map<string, Set<IpcListener>>();
 const messagePorts = new Map<string, MessagePort>();
 
 function unimplemented(method: string): never {
-  debugger;
   throw new Error(`[electron-stub] ${method} is not implemented`);
 }
 
@@ -370,7 +368,6 @@ function requestWorkspaceDirectoryEntries(
       type: "workspace-directory-entries-request",
       requestId,
       directoryPath,
-      directoriesOnly: true,
     });
   });
 }
@@ -379,10 +376,11 @@ const themeMediaQuery = matchMedia("(prefers-color-scheme: dark)");
 const mobileMediaQuery = matchMedia("(max-width: 768px)");
 const initialSidebarState = !mobileMediaQuery.matches;
 const electronShim = (window.__ELECTRON_SHIM__ ??= {});
+electronShim.catalogPagination = catalogPagination;
 electronShim.codexOnlyMode = codexOnlyMode();
 electronShim.codexOnly = { ...codexOnlyUi, brandMessages, brandDescriptor };
 if (codexOnlyMode()) document.title = "Codex";
-const buildFlavor: "prod" | "dev" | "agent" | string = "prod";
+const buildFlavor = "prod";
 
 Object.assign(globalThis, {
   process: {
@@ -474,7 +472,25 @@ export const ipcRenderer = {
         return handleLocalFilePickerMessage(args[0]);
       }
 
+      if (
+        isRecord(args[0]) &&
+        args[0].type === "electron-pick-workspace-root-option"
+      ) {
+        return openSelectWorkspaceRootDialog({
+          listDirectory: requestWorkspaceDirectoryEntries,
+        }).then((root) => {
+          if (root) {
+            // Picking a source only updates the open form. Creating the project
+            // remains the responsibility of its submit button.
+            emitRendererEvent("codex_desktop:message-for-view", [
+              { type: "workspace-root-option-picked", root },
+            ]);
+          }
+        });
+      }
+
       if (isUnhandledAddWorkspaceRootOptionMessage(args[0])) {
+        const message = args[0];
         return openSelectWorkspaceRootDialog({
           listDirectory: requestWorkspaceDirectoryEntries,
         }).then((root) => {
@@ -482,7 +498,7 @@ export const ipcRenderer = {
             return undefined;
           }
 
-          return invokeMain(channel, [{ ...args[0], root }]);
+          return invokeMain(channel, [{ ...message, root }]);
         });
       }
     }
@@ -613,6 +629,8 @@ export const ipcRenderer = {
 
 ensureSocket();
 
+installFileDownloads();
+
 export const contextBridge = {
   exposeInMainWorld(_key: string, _api: unknown): void {
     Reflect.set(window, _key, _api);
@@ -621,6 +639,8 @@ export const contextBridge = {
 
 export const webUtils = {
   getPathForFile(_file: File): string | null {
-    return unimplemented("webUtils.getPathForFile");
+    // Browser Files have no server-side path. Returning null activates the
+    // upstream byte-copy fallback for pasted/dropped images and attachments.
+    return null;
   },
 };

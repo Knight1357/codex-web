@@ -4,7 +4,7 @@ export function UpIcon(): React.ReactElement {
   return (
     <svg
       aria-hidden="true"
-      className={["icon-2xs"].join(" ")}
+      className="icon-2xs"
       fill="none"
       height="20"
       viewBox="0 0 20 20"

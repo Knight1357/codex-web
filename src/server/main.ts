@@ -3,6 +3,7 @@
 declare global {
   var __CODEX_SHIM_VALUES__: {
     version: string;
+    codexOnlyMode: boolean;
   };
 }
 
@@ -17,8 +18,10 @@ import Fastify from "fastify";
 import fastifyMultipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { installModuleAliasHook } from "./module";
-import { glob } from "glob";
 import { readUiConfig, uiConfigScript } from "./ui-config";
+import { registerWebAssets } from "./web-assets";
+import { registerWorkspaceDirectory } from "./workspace-directory";
+import { registerFileDownload } from "./file-download";
 
 type ServerOptions = {
   host: string;
@@ -31,20 +34,17 @@ type RendererToMainMessage =
       requestId: string;
       channel: string;
       args: unknown[];
-      sourceUrl: string;
     }
   | {
       type: "ipc-renderer-send";
       channel: string;
       args: unknown[];
-      sourceUrl: string;
     }
   | {
       type: "ipc-renderer-post-message";
       channel: string;
       message: unknown;
       portIds: string[];
-      sourceUrl?: string;
     }
   | {
       type: "message-port-message";
@@ -59,7 +59,6 @@ type RendererToMainMessage =
       type: "workspace-directory-entries-request";
       requestId: string;
       directoryPath: string | null;
-      directoriesOnly: boolean;
     };
 
 type MainToRendererMessage =
@@ -105,7 +104,6 @@ type MainToRendererMessage =
 type WorkspaceDirectoryEntry = {
   name: string;
   path: string;
-  type: "directory" | "file";
 };
 
 type WorkspaceDirectoryEntries = {
@@ -208,12 +206,6 @@ class WebSocketMessagePort implements BridgedMessagePort {
   }
 }
 
-function workspaceDirectoryEntryTypeRank(
-  entry: WorkspaceDirectoryEntry,
-): number {
-  return entry.type === "directory" ? 0 : 1;
-}
-
 function workspaceDirectoryEntryHiddenRank(
   entry: WorkspaceDirectoryEntry,
 ): number {
@@ -225,8 +217,6 @@ function compareWorkspaceDirectoryEntries(
   right: WorkspaceDirectoryEntry,
 ): number {
   return (
-    workspaceDirectoryEntryTypeRank(left) -
-      workspaceDirectoryEntryTypeRank(right) ||
     workspaceDirectoryEntryHiddenRank(left) -
       workspaceDirectoryEntryHiddenRank(right) ||
     left.name.localeCompare(right.name)
@@ -337,12 +327,11 @@ function errorMessage(error: unknown): string {
 
 async function getWorkspaceDirectoryEntries({
   directoryPath,
-  directoriesOnly,
 }: {
   directoryPath: string | null;
-  directoriesOnly: boolean;
 }): Promise<WorkspaceDirectoryEntries> {
-  const requestedPath = directoryPath?.trim() || os.homedir();
+  // Docker starts the server in the persistent /workspace directory.
+  const requestedPath = directoryPath?.trim() || process.cwd();
   const resolvedPath = path.resolve(requestedPath);
   const stat = await fs.stat(resolvedPath);
   if (!stat.isDirectory()) {
@@ -350,20 +339,11 @@ async function getWorkspaceDirectoryEntries({
   }
 
   const entries = (await fs.readdir(resolvedPath, { withFileTypes: true }))
-    .flatMap((entry): WorkspaceDirectoryEntry[] => {
-      const type = entry.isDirectory() ? "directory" : "file";
-      if (directoriesOnly && type !== "directory") {
-        return [];
-      }
-
-      return [
-        {
-          name: entry.name,
-          path: path.join(resolvedPath, entry.name),
-          type,
-        },
-      ];
-    })
+    .filter((entry) => entry.isDirectory())
+    .map((entry): WorkspaceDirectoryEntry => ({
+      name: entry.name,
+      path: path.join(resolvedPath, entry.name),
+    }))
     .sort(compareWorkspaceDirectoryEntries);
 
   const rootPath = path.parse(resolvedPath).root;
@@ -458,10 +438,12 @@ async function startIpcBridgeServer(options: ServerOptions): Promise<void> {
     decorateReply: false,
   });
 
-  await app.register(fastifyStatic, {
-    root: path.resolve(__dirname, "../../scratch/asar/webview"),
-    prefix: "/",
-  });
+  await registerWorkspaceDirectory(app);
+  await registerFileDownload(app);
+  await registerWebAssets(
+    app,
+    path.resolve(__dirname, "../../scratch/asar/webview"),
+  );
 
   const uiConfig = readUiConfig();
   app.get("/__backend/ui-config.js", async (_request, reply) => {
@@ -709,12 +691,16 @@ async function startIpcBridgeServer(options: ServerOptions): Promise<void> {
 
   globalThis.__CODEX_SHIM_VALUES__ = {
     version: packageJson.version,
+    codexOnlyMode: uiConfig.codexOnlyMode,
   };
 
-  const matches = await glob("../../scratch/asar/.vite/build/main-*.js", {
-    nodir: true,
-    cwd: __dirname,
-  });
+  const bundleDirectory = path.resolve(
+    __dirname,
+    "../../scratch/asar/.vite/build",
+  );
+  const matches = (await fs.readdir(bundleDirectory, { withFileTypes: true }))
+    .filter((entry) => entry.isFile() && /^main-.*\.js$/.test(entry.name))
+    .map((entry) => path.join(bundleDirectory, entry.name));
 
   if (matches.length === 0) {
     throw new Error("no main bundle found");

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { runInNewContext } from "node:vm";
 import ts from "typescript";
 
 // Exercise the real browser policy without launching the CLI or reading credentials.
@@ -40,6 +41,42 @@ const enabled = (value) => {
 };
 
 try {
+  test("server publishes the mode flag read by upstream catalog patches", async () => {
+    const source = await readFile(resolve("src/server/main.ts"), "utf8");
+    const ast = ts.createSourceFile(
+      "main.ts",
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    let publication;
+    function visit(node) {
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        node.left.getText(ast) === "globalThis.__CODEX_SHIM_VALUES__"
+      )
+        publication = node.getText(ast);
+      ts.forEachChild(node, visit);
+    }
+    visit(ast);
+    assert.ok(publication, "server must publish values before loading the app");
+    const patch = await readFile(
+      resolve("patches/webview-catalog-pagination.patch"),
+      "utf8",
+    );
+    assert.match(patch, /globalThis\.__CODEX_SHIM_VALUES__\?\.codexOnlyMode/);
+    for (const codexOnlyMode of [false, true]) {
+      const globals = {};
+      runInNewContext(publication, {
+        globalThis: globals,
+        packageJson: { version: "test" },
+        uiConfig: { codexOnlyMode },
+      });
+      assert.equal(globals.__CODEX_SHIM_VALUES__.codexOnlyMode, codexOnlyMode);
+      assert.equal(globals.__CODEX_SHIM_VALUES__.version, "test");
+    }
+  });
   test("flag defaults off and accepts only true; publishes no environment or credentials", () => {
     for (const value of [undefined, "", "false", "0", "1", "yes"])
       assert.equal(
@@ -134,6 +171,16 @@ try {
       "/library",
       "/finance",
       "/settings/voice",
+      "/settings/account",
+      "/settings/usage",
+      "/plugins",
+      "/skills",
+      "/automations",
+      "/security",
+      "/pull-requests",
+      "/remote-connections",
+      "/settings/hooks-settings",
+      "/settings/cloud-environments",
       "/%63hatgpt/quick-chat",
     ])
       assert.equal(policy.isCodexRoute(path), false, path);
@@ -141,8 +188,6 @@ try {
       "/local/abc",
       "/remote/abc",
       "/projects",
-      "/settings/account",
-      "/settings/usage",
       "/settings/agent",
       "/login",
       "/auth/callback",
@@ -214,17 +259,18 @@ try {
           { id: "builtin:pull-requests" },
         ])
         .map((x) => x.id),
-      ["builtin:projects", "builtin:pull-requests"],
+      ["builtin:projects"],
     );
     assert.deepEqual(
       policy.codexOnlyUi
         .filterSettings([
           { slug: "account" },
+          { slug: "usage" },
           { slug: "voice" },
           { slug: "agent" },
         ])
         .map((x) => x.slug),
-      ["account", "agent"],
+      ["agent"],
     );
   });
   test("UI branding preserves ICU arguments, injected content and original catalogs", () => {

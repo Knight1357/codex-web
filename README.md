@@ -40,7 +40,27 @@ nix run github:0xcaff/codex-web
 
 then open <http://127.0.0.1:8214> in a browser.
 
+Generated file links (including `.mlx`, PDF, Office documents and archives) and
+local links labelled “下载” or “download” use the browser download manager.
+The backend streams the original bytes from the CLI machine through
+`/__backend/download`, preserving Unicode filenames. Missing files show an error
+instead of trying to open a desktop editor. Ordinary source-code links continue
+to use the editor. The download endpoint uses the same deployment authentication
+as the rest of the app and returns `Cache-Control: no-store`.
+
 ### Codex Only Mode
+
+Web startup falls back to a synchronous Statsig client if the optional desktop
+bootstrap fails, retaining SDK cache instead of waiting for another network
+initialization. `npm run test:startup` verifies that fallback and the unchanged
+successful bootstrap path.
+
+For this Mac deployment, `deploy/com.liushen.codex-web-tunnel.plist` maintains a
+loopback-only SSH reverse tunnel on the Los Angeles VPS (`127.0.0.1:18214`) to
+the local app. It uses the existing SSH alias and local SOCKS proxy on port 7897.
+The VPS proxy prefers that tunnel and can fall back to Tailscale; authentication
+remains at Caddy. The LaunchAgent must be installed under the user's
+`~/Library/LaunchAgents` to reconnect after login or a broken SSH connection.
 
 Set the server environment flag to make the browser client use only Codex:
 
@@ -54,8 +74,9 @@ For a server that needs the host's configured HTTP proxy (Node with environment 
 CODEX_ONLY_MODE=true NODE_USE_ENV_PROXY=1 npm run server
 ```
 
-The flag defaults to `false`. To restore the upstream UI, restart with
-`CODEX_ONLY_MODE=false`. Changing this runtime flag does not require rebuilding.
+The flag defaults to `false`; Docker enables it. Changing this runtime flag does
+not require rebuilding. Removed product implementations are not restored by
+turning this presentation flag off.
 A `.env` file is not loaded automatically; export the variable in your shell or
 pass `--env-file` to Node if you use one.
 
@@ -68,9 +89,16 @@ hidden. Codex projects, local/cloud Codex threads, file outputs, model/reasoning
 controls, review, approvals, sandbox controls, plugins, and account/authentication
 remain available. Codex Voice remains available with Codex labels.
 
+ChatGPT history sources are disabled in both the browser and the server in this
+mode. Thread pagination includes only Codex hosts (including remote and cloud
+Codex). Failed or stalled pagination stops automatic loading, preserves existing
+threads, and offers a Retry button.
+
 The flag is published as a boolean by `/__backend/ui-config.js` before the
-renderer starts. UI policy lives in `src/browser/codex-only.ts`; one additive
-`patches/webview-codex-only.patch` applies last in `scripts/prepare_asar`. UI message
+renderer starts. UI policy lives in `src/browser/codex-only.ts`; pagination policy
+lives in `src/browser/catalog-pagination.ts`. The additive
+`patches/webview-codex-only.patch` and `patches/webview-catalog-pagination.patch`
+apply after the upstream patches in `scripts/prepare_asar`. UI message
 literals are branded before interpolation; user content and model responses are
 not rewritten. Stored product/detail preferences, OAuth URLs, tokens, account
 capabilities and the CLI/app-server protocol are not changed. This is a UI mode,
@@ -99,6 +127,87 @@ server.
 ```bash
 codex login --device-auth
 ```
+
+### Docker
+
+Build and start the browser server and the included Linux Codex CLI:
+
+```bash
+docker compose up -d --build
+```
+
+Open <http://127.0.0.1:8214> and sign in from the web UI. Compose also exposes
+the OAuth callback on `127.0.0.1:1455`; a container-side TCP relay forwards it to
+the CLI's loopback-only listener. Keep that port available on your host.
+Alternatively, sign in inside the running container using the device flow
+(complete the displayed steps in your browser):
+
+```bash
+docker compose exec codex-web codex login --device-auth
+```
+
+The `codex-home` volume keeps the container user's home directory, including
+Codex login state, configuration and sessions. The `workspace` volume keeps
+projects under `/workspace`. These are separate from the Mac's Codex data.
+The folder picker starts in the server's working directory (`/workspace` in
+Docker). Select that directory or one of its subfolders; selecting a source
+folder fills in the creation form, and the project is saved only when you click
+Create project. You can add more source folders by opening the picker again.
+Use New folder in the picker to create a named child of the currently displayed
+directory. The list refreshes and selects the new folder. Directory creation is
+immediate and remains on disk even if project creation is later canceled.
+To work on a host project, add a bind mount for it under `/workspace` in
+`compose.yaml`. The service is exposed only on this machine's loopback address.
+
+```bash
+docker compose logs --tail=100 codex-web
+docker compose stop
+docker compose start
+```
+
+The Docker build defaults to Codex CLI `0.165.0`. The model picker uses the
+CLI's account-provided model catalog; newer models may require a CLI update.
+The Nix package is pinned separately in `nix/codex/default.nix`.
+Override `CODEX_CLI_VERSION` as a Docker build argument
+if a different version is needed. The image builds the patched browser assets
+from the upstream desktop archive; it does not need a graphical desktop.
+
+### Public access performance
+
+The build also runs `scripts/strip-unused.mjs` after applying upstream patches.
+This deployment exposes projects, threads, archive and basic settings. Product
+pages for ChatGPT, GPT discovery, Appgen, Workspace Agents, remote host management,
+automations, PR navigation, plugin marketplace and skills management are removed
+or blocked. Installed tools, CLI execution, authentication and approvals remain.
+It removes disabled pet, Chronicle, Library and Quick Chat page implementations,
+pet listing and promotion requests, the automatic primary-runtime update poll,
+and browser source maps. Minimal export shells remain where upstream imports
+require them. Manual runtime installation and shared account, CLI, IPC and plugin
+services remain available. Native Electron compatibility calls are silent.
+Account and usage/billing settings pages are removed from navigation and blocked
+by the Codex-only route policy; CLI authentication and account capabilities remain.
+The PWA share-target declaration is removed; installation remains available.
+
+Use `npm run test:cleanup` to verify that removed pages retain import contracts
+without running their original product code.
+
+`npm run build:browser` also generates gzip and Brotli copies of static assets.
+The server negotiates these with `Accept-Encoding`, including when accessed
+through a reverse proxy. Compression runs at build time so the server does not
+recompress the desktop bundles on every request.
+
+Static assets use `Vary: Accept-Encoding` and `Cache-Control: private, no-cache`.
+Browsers may retain them and revalidate with ETags; unchanged assets return 304
+without downloading the bundle again. Patched upstream assets keep their names
+between builds, so they must not be given an unconditional immutable cache.
+HTML and runtime configuration use `no-store`.
+
+If Caddy fronts the service, replace a site-wide `Cache-Control: no-store` rule
+with the directives in `deploy/Caddyfile.performance` inside the existing site
+block. Keep the existing authentication, TLS, and reverse proxy configuration.
+See the [Caddy compression documentation](https://caddyserver.com/docs/caddyfile/directives/encode).
+
+Verify static serving with `npm run build:server && npm run test:web-assets`.
 
 ### proxying to app-server (advanced usage)
 

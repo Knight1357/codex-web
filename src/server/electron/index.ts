@@ -1,3 +1,4 @@
+// Keep native desktop API no-ops for calls made by the upstream app.
 type StubFunction = (...args: unknown[]) => unknown;
 type StubListener = (...args: unknown[]) => void;
 type StubMessagePort = {
@@ -68,23 +69,11 @@ function getIpcMainBridgeState(): IpcMainBridgeState {
   return globals.__codexElectronIpcBridge;
 }
 
-function log(method: string, args: unknown[]): void {
-  console.log(`[electron-main-stub] ${method}`, args);
-}
-
 function createDeepStub(pathLabel: string): StubFunction {
-  const fn: StubFunction = (...args: unknown[]) => {
-    log(`${pathLabel}()`, args);
-    return undefined;
-  };
+  const fn: StubFunction = () => undefined;
 
   return new Proxy(fn, {
-    apply(_target, _thisArg, argArray) {
-      log(`${pathLabel}()`, argArray);
-      return undefined;
-    },
-    construct(_target, argArray) {
-      log(`new ${pathLabel}()`, argArray);
+    construct(_target, _argArray) {
       return {};
     },
     get(_target, prop) {
@@ -106,7 +95,7 @@ function createDeepStub(pathLabel: string): StubFunction {
   });
 }
 
-function createEmitterStub(label: string): {
+function createEmitterStub(): {
   addListener: (event: string, listener: StubListener) => unknown;
   emit: (event: string, ...args: unknown[]) => boolean;
   off: (event: string, listener: StubListener) => unknown;
@@ -118,14 +107,12 @@ function createEmitterStub(label: string): {
 
   const api = {
     on(event: string, listener: StubListener): unknown {
-      log(`${label}.on`, [event, listener]);
       const eventListeners = listeners.get(event) ?? new Set<StubListener>();
       eventListeners.add(listener);
       listeners.set(event, eventListeners);
       return api;
     },
     once(event: string, listener: StubListener): unknown {
-      log(`${label}.once`, [event, listener]);
       const wrapped: StubListener = (...args: unknown[]) => {
         api.removeListener(event, wrapped);
         listener(...args);
@@ -133,20 +120,16 @@ function createEmitterStub(label: string): {
       return api.on(event, wrapped);
     },
     addListener(event: string, listener: StubListener): unknown {
-      log(`${label}.addListener`, [event, listener]);
       return api.on(event, listener);
     },
     removeListener(event: string, listener: StubListener): unknown {
-      log(`${label}.removeListener`, [event, listener]);
       listeners.get(event)?.delete(listener);
       return api;
     },
     off(event: string, listener: StubListener): unknown {
-      log(`${label}.off`, [event, listener]);
       return api.removeListener(event, listener);
     },
     emit(event: string, ...args: unknown[]): boolean {
-      log(`${label}.emit`, [event, ...args]);
       for (const listener of listeners.get(event) ?? []) {
         listener(...args);
       }
@@ -157,20 +140,16 @@ function createEmitterStub(label: string): {
   return api;
 }
 
-function createMessagePortStub(label: string): {
+function createMessagePortStub(): {
   on: (event: string, listener: StubListener) => unknown;
   postMessage: (...args: unknown[]) => void;
   start: () => void;
 } {
-  const emitter = createEmitterStub(label);
+  const emitter = createEmitterStub();
   return {
     on: emitter.on,
-    postMessage(...args: unknown[]): void {
-      log(`${label}.postMessage`, args);
-    },
-    start(): void {
-      log(`${label}.start`, []);
-    },
+    postMessage(..._args: unknown[]): void {},
+    start(): void {},
   };
 }
 
@@ -207,7 +186,7 @@ function createIpcMainStub(): {
   on: (event: string, listener: StubListener) => unknown;
   removeHandler: (channel: string) => void;
 } {
-  const emitter = createEmitterStub("ipcMain");
+  const emitter = createEmitterStub();
   const handlers = new Map<
     string,
     (event: unknown, ...args: unknown[]) => unknown
@@ -276,11 +255,9 @@ function createIpcMainStub(): {
       channel: string,
       handler: (event: unknown, ...args: unknown[]) => unknown,
     ): void {
-      log("ipcMain.handle", [channel, handler]);
       handlers.set(channel, handler);
     },
     removeHandler(channel: string): void {
-      log("ipcMain.removeHandler", [channel]);
       handlers.delete(channel);
     },
   };
@@ -288,105 +265,74 @@ function createIpcMainStub(): {
 
 let appReady = false;
 const commandLineSwitches = new Map<string, string>();
-const commandLineArguments: string[] = [];
 
 const appBase = {
-  ...createEmitterStub("app"),
+  ...createEmitterStub(),
   name: "Codex",
   isPackaged: false,
   getName(): string {
-    log("app.getName", []);
     return "Codex";
   },
   getVersion(): string {
     return globalThis.__CODEX_SHIM_VALUES__.version;
   },
   getLocale(): string {
-    log("app.getLocale", []);
     return "en-US";
   },
   getSystemLocale(): string {
-    log("app.getSystemLocale", []);
     return "en-US";
   },
   getPreferredSystemLanguages(): string[] {
-    log("app.getPreferredSystemLanguages", []);
     return ["en-US"];
   },
-  getPath(name: string): string {
-    log("app.getPath", [name]);
+  getPath(_name: string): string {
     return process.cwd();
   },
   getAppMetrics(): unknown[] {
-    log("app.getAppMetrics", []);
     return [];
   },
   getAppPath(): string {
-    log("app.getAppPath", []);
     return process.cwd();
   },
-  async getGPUInfo(infoLevel: string): Promise<{ gpuDevice: unknown[] }> {
-    log("app.getGPUInfo", [infoLevel]);
+  async getGPUInfo(_infoLevel: string): Promise<{ gpuDevice: unknown[] }> {
     return { gpuDevice: [] };
   },
-  setName(name: string): void {
-    log("app.setName", [name]);
-  },
-  setPath(name: string, value: string): void {
-    log("app.setPath", [name, value]);
-  },
-  setAppUserModelId(value: string): void {
-    log("app.setAppUserModelId", [value]);
-  },
+  setName(_name: string): void {},
+  setPath(_name: string, _value: string): void {},
+  setAppUserModelId(_value: string): void {},
   requestSingleInstanceLock(): boolean {
-    log("app.requestSingleInstanceLock", []);
     return true;
   },
   isReady(): boolean {
-    log("app.isReady", []);
     return appReady;
   },
   whenReady(): Promise<void> {
-    log("app.whenReady", []);
     appReady = true;
     return Promise.resolve();
   },
   commandLine: {
     appendSwitch(name: string, value?: string): void {
-      log("app.commandLine.appendSwitch", [name, value]);
       commandLineSwitches.set(name, value ?? "");
     },
-    appendArgument(value: string): void {
-      log("app.commandLine.appendArgument", [value]);
-      commandLineArguments.push(value);
-    },
+    appendArgument(_value: string): void {},
     getSwitchValue(name: string): string {
-      log("app.commandLine.getSwitchValue", [name]);
       return commandLineSwitches.get(name) ?? "";
     },
     hasSwitch(name: string): boolean {
-      log("app.commandLine.hasSwitch", [name]);
       return commandLineSwitches.has(name);
     },
     removeSwitch(name: string): void {
-      log("app.commandLine.removeSwitch", [name]);
       commandLineSwitches.delete(name);
     },
   },
-  on(event: string, listener: (...args: unknown[]) => void): unknown {
-    log("app.on", [event, listener]);
+  on(_event: string, _listener: (...args: unknown[]) => void): unknown {
     return app;
   },
-  once(event: string, listener: (...args: unknown[]) => void): unknown {
-    log("app.once", [event, listener]);
+  once(_event: string, _listener: (...args: unknown[]) => void): unknown {
     return app;
   },
-  quit(): void {
-    log("app.quit", []);
-  },
-  exit(code?: number): void {
-    log("app.exit", [code]);
-  },
+  quit(): void {},
+  exit(_code?: number): void {},
 };
 
 const app = new Proxy(appBase as Record<string, unknown>, {
@@ -426,14 +372,11 @@ class BrowserWindow {
   private readonly emitter: ReturnType<typeof createEmitterStub>;
 
   constructor(...args: unknown[]) {
-    log("new BrowserWindow", args);
     this.visible = (args[0] as { show?: boolean } | undefined)?.show !== false;
     this.id = BrowserWindow.nextId++;
-    this.emitter = createEmitterStub(`BrowserWindow#${this.id}`);
+    this.emitter = createEmitterStub();
 
-    const webContentsEmitter = createEmitterStub(
-      `BrowserWindow#${this.id}.webContents`,
-    );
+    const webContentsEmitter = createEmitterStub();
     this.webContents = new Proxy(
       {
         ...webContentsEmitter,
@@ -442,7 +385,6 @@ class BrowserWindow {
           url: "",
         },
         getURL: (): string => {
-          log(`BrowserWindow#${this.id}.webContents.getURL`, []);
           return String(
             (this.webContents.mainFrame as { url?: string } | undefined)?.url ??
               "",
@@ -450,20 +392,11 @@ class BrowserWindow {
         },
         isDestroyed: (): boolean => this.destroyed,
         loadURL: async (url: string): Promise<void> => {
-          log(`BrowserWindow#${this.id}.webContents.loadURL`, [url]);
           (this.webContents.mainFrame as { url: string }).url = url;
         },
-        loadFile: async (...loadFileArgs: unknown[]): Promise<void> => {
-          log(`BrowserWindow#${this.id}.webContents.loadFile`, loadFileArgs);
-        },
-        openDevTools: (...openDevToolsArgs: unknown[]): void => {
-          log(
-            `BrowserWindow#${this.id}.webContents.openDevTools`,
-            openDevToolsArgs,
-          );
-        },
+        loadFile: async (..._loadFileArgs: unknown[]): Promise<void> => {},
+        openDevTools: (..._openDevToolsArgs: unknown[]): void => {},
         send: (...sendArgs: unknown[]): void => {
-          log(`BrowserWindow#${this.id}.webContents.send`, sendArgs);
           if (sendArgs.length === 0 || typeof sendArgs[0] !== "string") {
             return;
           }
@@ -511,12 +444,10 @@ class BrowserWindow {
   }
 
   static getAllWindows(): BrowserWindow[] {
-    log("BrowserWindow.getAllWindows", []);
     return BrowserWindow.allWindows.filter((window) => !window.destroyed);
   }
 
   static getFocusedWindow(): BrowserWindow | null {
-    log("BrowserWindow.getFocusedWindow", []);
     if (BrowserWindow.focusedWindow && !BrowserWindow.focusedWindow.destroyed) {
       return BrowserWindow.focusedWindow;
     }
@@ -526,7 +457,6 @@ class BrowserWindow {
   static fromWebContents(
     webContents: { id?: unknown } | null | undefined,
   ): BrowserWindow | null {
-    log("BrowserWindow.fromWebContents", [webContents]);
     if (!webContents) {
       return null;
     }
@@ -557,12 +487,10 @@ class BrowserWindow {
   }
 
   async loadURL(url: string): Promise<void> {
-    log(`BrowserWindow#${this.id}.loadURL`, [url]);
     (this.webContents.mainFrame as { url: string }).url = url;
   }
 
   close(): void {
-    log(`BrowserWindow#${this.id}.close`, []);
     this.emitter.emit("close", {
       preventDefault: () => undefined,
     });
@@ -570,7 +498,6 @@ class BrowserWindow {
   }
 
   destroy(): void {
-    log(`BrowserWindow#${this.id}.destroy`, []);
     if (this.destroyed) return;
     this.destroyed = true;
     (this.webContents.emit as StubFunction)("destroyed");
@@ -584,12 +511,10 @@ class BrowserWindow {
   }
 
   isDestroyed(): boolean {
-    log(`BrowserWindow#${this.id}.isDestroyed`, []);
     return this.destroyed;
   }
 
   isFocused(): boolean {
-    log(`BrowserWindow#${this.id}.isFocused`, []);
     return BrowserWindow.focusedWindow === this && !this.destroyed;
   }
 
@@ -597,22 +522,17 @@ class BrowserWindow {
     return this.visible && !this.destroyed;
   }
 
-  removeMenu(): void {
-    log(`BrowserWindow#${this.id}.removeMenu`, []);
-  }
+  removeMenu(): void {}
 
   getTitle(): string {
-    log(`BrowserWindow#${this.id}.getTitle`, []);
     return this.title;
   }
 
   setTitle(nextTitle: string): void {
-    log(`BrowserWindow#${this.id}.setTitle`, [nextTitle]);
     this.title = nextTitle;
   }
 
   getBounds(): { height: number; width: number; x: number; y: number } {
-    log(`BrowserWindow#${this.id}.getBounds`, []);
     return { ...this.bounds };
   }
 
@@ -622,7 +542,6 @@ class BrowserWindow {
     x?: number;
     y?: number;
   }): void {
-    log(`BrowserWindow#${this.id}.setBounds`, [nextBounds]);
     this.bounds = {
       x: nextBounds.x ?? this.bounds.x,
       y: nextBounds.y ?? this.bounds.y,
@@ -632,26 +551,21 @@ class BrowserWindow {
   }
 
   show(): void {
-    log(`BrowserWindow#${this.id}.show`, []);
     this.visible = true;
   }
 
   hide(): void {
-    log(`BrowserWindow#${this.id}.hide`, []);
     this.visible = false;
   }
 
   focus(): void {
-    log(`BrowserWindow#${this.id}.focus`, []);
     BrowserWindow.focusedWindow = this;
     this.emitter.emit("focus");
   }
 }
 
 class WebContentsView {
-  constructor(...args: unknown[]) {
-    log("new WebContentsView", args);
-  }
+  constructor(..._args: unknown[]) {}
 }
 
 class Menu {
@@ -663,23 +577,19 @@ class Menu {
   }
 
   static buildFromTemplate(template: unknown[]): Menu {
-    log("Menu.buildFromTemplate", [template]);
     const items = template.map((entry) => new MenuItem(entry));
     return new Menu(items);
   }
 
   static setApplicationMenu(menu: Menu | null): void {
-    log("Menu.setApplicationMenu", [menu]);
     Menu.applicationMenu = menu;
   }
 
   static getApplicationMenu(): Menu | null {
-    log("Menu.getApplicationMenu", []);
     return Menu.applicationMenu;
   }
 
   getMenuItemById(id: string): MenuItem | undefined {
-    log("Menu.getMenuItemById", [id]);
     const queue = [...this.items];
     while (queue.length > 0) {
       const candidate = queue.shift();
@@ -697,19 +607,15 @@ class Menu {
   }
 
   append(item: MenuItem): void {
-    log("Menu.append", [item]);
     this.items.push(item);
   }
 
   insert(pos: number, item: MenuItem): void {
-    log("Menu.insert", [pos, item]);
     const index = Math.max(0, Math.min(pos, this.items.length));
     this.items.splice(index, 0, item);
   }
 
-  popup(...args: unknown[]): void {
-    log("Menu.popup", args);
-  }
+  popup(..._args: unknown[]): void {}
 }
 
 class MenuItem {
@@ -724,7 +630,6 @@ class MenuItem {
   visible?: boolean;
 
   constructor(...args: unknown[]) {
-    log("new MenuItem", args);
     const [options] = args as [Record<string, unknown>?];
     if (!options || typeof options !== "object") {
       return;
@@ -756,60 +661,43 @@ class MenuItem {
 }
 
 class Tray {
-  constructor(...args: unknown[]) {
-    log("new Tray", args);
-  }
+  constructor(..._args: unknown[]) {}
 }
 
 class Notification {
-  constructor(...args: unknown[]) {
-    log("new Notification", args);
-  }
+  constructor(..._args: unknown[]) {}
 
-  show(): void {
-    log("Notification.show", []);
-  }
+  show(): void {}
 }
 
 const dialog = {
-  async showMessageBox(...args: unknown[]): Promise<{ response: number }> {
-    log("dialog.showMessageBox", args);
+  async showMessageBox(..._args: unknown[]): Promise<{ response: number }> {
     return { response: 0 };
   },
 };
 
 const crashReporter = {
-  start(...args: unknown[]): void {
-    log("crashReporter.start", args);
-  },
+  start(..._args: unknown[]): void {},
 };
 
 const net = {
   async fetch(input: string | URL, init?: RequestInit): Promise<Response> {
-    // log("net.fetch", [input, init]);
-    if (typeof globalThis.fetch === "function") {
-      return globalThis.fetch(input as URL | RequestInfo, init);
-    }
-    return new Response("", { status: 204 });
+    return globalThis.fetch(input, init);
   },
-  request(...args: unknown[]): {
+  request(..._args: unknown[]): {
     getHeader: (name: string) => string | undefined;
     once: (event: string, listener: StubListener) => unknown;
     setHeader: (name: string, value: string) => void;
   } {
-    // log("net.request", args);
     const headers = new Map<string, string>();
     const request = {
       setHeader(name: string, value: string): void {
-        // log("net.request.setHeader", [name, value]);
         headers.set(name.toLowerCase(), value);
       },
       getHeader(name: string): string | undefined {
-        // log("net.request.getHeader", [name]);
         return headers.get(name.toLowerCase());
       },
-      once(event: string, listener: StubListener): unknown {
-        // log("net.request.once", [event, listener]);
+      once(_event: string, _listener: StubListener): unknown {
         return request;
       },
     };
@@ -817,10 +705,10 @@ const net = {
   },
 };
 
-const autoUpdater = createEmitterStub("autoUpdater");
+const autoUpdater = createEmitterStub();
 const ipcMain = createIpcMainStub();
 const nativeTheme = {
-  ...createEmitterStub("nativeTheme"),
+  ...createEmitterStub(),
   shouldUseDarkColors: false,
   shouldUseHighContrastColors: false,
   shouldUseInvertedColorScheme: false,
@@ -828,20 +716,18 @@ const nativeTheme = {
 };
 const nativeImage = {
   createEmpty(): { isEmpty: () => boolean } {
-    log("nativeImage.createEmpty", []);
     return {
       isEmpty: () => true,
     };
   },
   createFromPath(imagePath: string): { isEmpty: () => boolean } {
-    log("nativeImage.createFromPath", [imagePath]);
     return {
       isEmpty: () => !imagePath,
     };
   },
 };
 const powerMonitor = {
-  ...createEmitterStub("powerMonitor"),
+  ...createEmitterStub(),
   getSystemIdleState(_idleThreshold: number): string {
     return "unknown";
   },
@@ -854,184 +740,89 @@ const powerMonitor = {
 };
 // Desktop shortcuts and sleep inhibitors have no native window in the web host.
 const globalShortcut = {
-  register(...args: unknown[]): boolean {
-    log("globalShortcut.register", args);
+  register(..._args: unknown[]): boolean {
     return false;
   },
   isRegistered(_accelerator: string): boolean {
     return false;
   },
-  unregister(...args: unknown[]): void {
-    log("globalShortcut.unregister", args);
-  },
+  unregister(..._args: unknown[]): void {},
   unregisterAll(): void {},
 };
 const powerSaveBlocker = {
-  start(type: string): number {
-    log("powerSaveBlocker.start", [type]);
+  start(_type: string): number {
     return 0;
   },
-  stop(id: number): void {
-    log("powerSaveBlocker.stop", [id]);
-  },
+  stop(_id: number): void {},
   isStarted(_id: number): boolean {
     return false;
   },
 };
 const screen = {
-  ...createEmitterStub("screen"),
-  getAllDisplays(): Array<{
-    id: number;
-    scaleFactor: number;
-    size: { height: number; width: number };
-    workArea: { height: number; width: number; x: number; y: number };
-    workAreaSize: { height: number; width: number };
-    bounds: { height: number; width: number; x: number; y: number };
-  }> {
-    log("screen.getAllDisplays", []);
+  ...createEmitterStub(),
+  getAllDisplays() {
     return [this.getPrimaryDisplay()];
   },
-  getDisplayMatching(): {
-    id: number;
-    scaleFactor: number;
-    size: { height: number; width: number };
-    workArea: { height: number; width: number; x: number; y: number };
-    workAreaSize: { height: number; width: number };
-    bounds: { height: number; width: number; x: number; y: number };
-  } {
-    log("screen.getDisplayMatching", []);
+  getDisplayMatching() {
     return this.getPrimaryDisplay();
   },
-  getPrimaryDisplay(): {
-    id: number;
-    scaleFactor: number;
-    size: { height: number; width: number };
-    workArea: { height: number; width: number; x: number; y: number };
-    workAreaSize: { height: number; width: number };
-    bounds: { height: number; width: number; x: number; y: number };
-  } {
-    log("screen.getPrimaryDisplay", []);
+  getPrimaryDisplay() {
     return {
       id: 1,
-      scaleFactor: 2,
-      size: { width: 1440, height: 900 },
-      workArea: { x: 0, y: 0, width: 1440, height: 900 },
-      workAreaSize: { width: 1440, height: 900 },
-      bounds: { x: 0, y: 0, width: 1440, height: 900 },
+      scaleFactor: 1,
+      size: { width: 1280, height: 820 },
+      workArea: { x: 0, y: 0, width: 1280, height: 820 },
+      workAreaSize: { width: 1280, height: 820 },
+      bounds: { x: 0, y: 0, width: 1280, height: 820 },
     };
   },
 };
+
 const protocol = {
-  registerSchemesAsPrivileged(...args: unknown[]): void {
-    log("protocol.registerSchemesAsPrivileged", args);
-  },
-  handle(...args: unknown[]): void {
-    log("protocol.handle", args);
-  },
-  registerStringProtocol(...args: unknown[]): void {
-    log("protocol.registerStringProtocol", args);
-  },
+  registerSchemesAsPrivileged(..._args: unknown[]): void {},
+  handle(..._args: unknown[]): void {},
+  registerStringProtocol(..._args: unknown[]): void {},
 };
-function createSessionStub(label: string): {
-  cookies: ReturnType<typeof createEmitterStub> & {
-    get: (...args: unknown[]) => Promise<unknown[]>;
-    remove: (...args: unknown[]) => Promise<void>;
-    set: (...args: unknown[]) => Promise<void>;
-  };
-  getUserAgent: () => string;
-  getDownloadHistory: () => Promise<unknown[]>;
-  loadExtension: (extensionPath: string) => Promise<{
-    id: string;
-    name: string;
-    path: string;
-    version: string;
-  }>;
-  off: (event: string, listener: StubListener) => unknown;
-  on: (event: string, listener: StubListener) => unknown;
-  once: (event: string, listener: StubListener) => unknown;
-  protocol: typeof protocol;
-  removeListener: (event: string, listener: StubListener) => unknown;
-  setPermissionCheckHandler: (...args: unknown[]) => void;
-  setPermissionRequestHandler: (...args: unknown[]) => void;
-  setPreferredLanguages: (languages: string[]) => void;
-  webRequest: {
-    onBeforeRequest: (...args: unknown[]) => void;
-    onBeforeSendHeaders: (...args: unknown[]) => void;
-  };
-} {
-  const emitter = createEmitterStub(label);
+function createSessionStub() {
+  const emitter = createEmitterStub();
   return {
+    ...emitter,
     cookies: {
-      ...createEmitterStub(`${label}.cookies`),
-      async get(...args: unknown[]): Promise<unknown[]> {
-        log(`${label}.cookies.get`, args);
-        return [];
-      },
-      async remove(...args: unknown[]): Promise<void> {
-        log(`${label}.cookies.remove`, args);
-      },
-      async set(...args: unknown[]): Promise<void> {
-        log(`${label}.cookies.set`, args);
-      },
+      ...createEmitterStub(),
+      get: async (..._args: unknown[]) => [] as unknown[],
+      remove: async (..._args: unknown[]) => {},
+      set: async (..._args: unknown[]) => {},
     },
-    async getDownloadHistory(): Promise<unknown[]> {
-      return [];
-    },
-    async loadExtension(extensionPath: string): Promise<{
-      id: string;
-      name: string;
-      path: string;
-      version: string;
-    }> {
-      log(`${label}.loadExtension`, [extensionPath]);
-      return {
-        id: "stub-extension",
-        name: "Stub Extension",
-        path: extensionPath,
-        version: "0.0.0",
-      };
-    },
-    getUserAgent(): string {
-      log(`${label}.getUserAgent`, []);
-      return "Mozilla/5.0 AppleWebKit/537.36 Chrome/120 Safari/537.36";
-    },
-    off: emitter.off,
-    on: emitter.on,
-    once: emitter.once,
+    getDownloadHistory: async () => [] as unknown[],
+    loadExtension: async (extensionPath: string) => ({
+      id: "unsupported",
+      name: "Unsupported",
+      path: extensionPath,
+      version: "0.0.0",
+    }),
+    getUserAgent: () =>
+      "Mozilla/5.0 AppleWebKit/537.36 Chrome/120 Safari/537.36",
     protocol,
-    removeListener: emitter.removeListener,
-    setPermissionCheckHandler(...args: unknown[]): void {
-      log(`${label}.setPermissionCheckHandler`, args);
-    },
-    setPermissionRequestHandler(...args: unknown[]): void {
-      log(`${label}.setPermissionRequestHandler`, args);
-    },
-    setPreferredLanguages(languages: string[]): void {
-      log(`${label}.setPreferredLanguages`, [languages]);
-    },
+    setPermissionCheckHandler: (..._args: unknown[]) => {},
+    setPermissionRequestHandler: (..._args: unknown[]) => {},
+    setPreferredLanguages: (_languages: string[]) => {},
     webRequest: {
-      onBeforeRequest(...args: unknown[]): void {
-        log(`${label}.webRequest.onBeforeRequest`, args);
-      },
-      onBeforeSendHeaders(...args: unknown[]): void {
-        log(`${label}.webRequest.onBeforeSendHeaders`, args);
-      },
+      onBeforeRequest: (..._args: unknown[]) => {},
+      onBeforeSendHeaders: (..._args: unknown[]) => {},
     },
   };
 }
+
 const partitionSessions = new Map<
   string,
   ReturnType<typeof createSessionStub>
 >();
 const session = {
-  defaultSession: createSessionStub("session.defaultSession"),
+  defaultSession: createSessionStub(),
   fromPartition(partition: string): ReturnType<typeof createSessionStub> {
-    log("session.fromPartition", [partition]);
     let partitionSession = partitionSessions.get(partition);
     if (!partitionSession) {
-      partitionSession = createSessionStub(
-        `session.fromPartition(${partition})`,
-      );
+      partitionSession = createSessionStub();
       partitionSessions.set(partition, partitionSession);
     }
     return partitionSession;
@@ -1042,23 +833,20 @@ const utilityProcess = {
 };
 const webContents = {
   fromId(id: number): Record<string, unknown> | undefined {
-    log("webContents.fromId", [id]);
     return BrowserWindow.getAllWindows().find(
       (window) => window.webContents.id === id,
     )?.webContents;
   },
   getAllWebContents(): Record<string, unknown>[] {
-    log("webContents.getAllWebContents", []);
     return BrowserWindow.getAllWindows().map((window) => window.webContents);
   },
   getFocusedWebContents(): Record<string, unknown> | null {
-    log("webContents.getFocusedWebContents", []);
     return BrowserWindow.getFocusedWindow()?.webContents ?? null;
   },
 };
 class MessageChannelMain {
-  port1 = createMessagePortStub("MessageChannelMain.port1");
-  port2 = createMessagePortStub("MessageChannelMain.port2");
+  port1 = createMessagePortStub();
+  port2 = createMessagePortStub();
 }
 
 const electronModule = new Proxy(

@@ -1,0 +1,8 @@
+# Add inside the existing authenticated Codex site block, replacing any
+# site-wide Cache-Control rule. Retain basic_auth, TLS and reverse_proxy.
+@codex_assets path /assets/*
+encode @codex_assets zstd gzip
+header @codex_assets >Cache-Control "private, no-cache"
+
+@codex_dynamic not path /assets/*
+header @codex_dynamic >Cache-Control "no-store"
